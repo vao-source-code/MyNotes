@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">MyNotes</string>
+    <string name="buscar_notas">Buscar Notas</string>
+    <string name="titulo_de_la_nota">Titulo de la nota</string>
+    <string name="subtitulo_de_la_nota">Subtitulo de la nota</string>
+    <string name="miscellaneous">Acesorios</string>
+    <string name="elige_color">Elige color</string>
+    <string name="agregar_imagen">Agregar imagen</string>
+</resources>
