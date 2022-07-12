@@ -1,8 +1,8 @@
 package com.example.mynotes.activities
 
 import android.Manifest
-import android.R.attr.data
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -22,14 +22,13 @@ import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.example.mynotes.R
 import com.example.mynotes.databases.NotesDatabases
 import com.example.mynotes.databinding.ActivityCreateNoteBinding
 import com.example.mynotes.entities.Note
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import java.io.IOException
-import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.Executors
@@ -42,32 +41,43 @@ class CreateNoteActivity : AppCompatActivity() {
         const val REQUEST_CODE_STORAGE_PERMISSION: Int = 1
         const val REQUEST_CODE_SELECT_IMAGE: Int = 2000
         const val REQUEST_CODE_PERMISSIONS = 1
-         val REQUIRED_PERMISSIONS =
-            arrayOf(Manifest.permission.CAMERA, Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE  )
+        val REQUIRED_PERMISSIONS =
+            arrayOf(
+                Manifest.permission.CAMERA,
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            )
 
     }
 
-    private var resultLauncher = registerForActivityResult(
+    private val startForActivityGallery = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-
-            val photoUri: Uri? = result.data?.data
-
-            // Load the image located at photoUri into selectedImage
-
-            // Load the image located at photoUri into selectedImage
-            val selectedImage = loadFromUri(photoUri)
-
-            createNoteBinding.imageNote.setImageBitmap(selectedImage)
+            val data: Uri? = result.data?.data
+            createNoteBinding.imageNote.setImageURI(data)
             createNoteBinding.imageNote.visibility = View.VISIBLE
-
-
+            if (data != null) {
+                imagePath = data
+            }
         }
+    }
+
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            selectAddImage()
+        } else {
+            Toast.makeText(this, "No tienes permisos para acceder", Toast.LENGTH_SHORT).show()
+        }
+
     }
 
     private lateinit var createNoteBinding: ActivityCreateNoteBinding
     private lateinit var selected: String  //default Color
+    private  lateinit  var imagePath: Uri
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -102,12 +112,12 @@ class CreateNoteActivity : AppCompatActivity() {
     private fun saveNote() {
         if (createNoteBinding.inputNoteTitle.text.toString().trim().isEmpty()) {
             Toast.makeText(this, "La nota debe poseer titulo", Toast.LENGTH_SHORT).show()
-            return;
+            return
         } else if (createNoteBinding.inputNoteSubtitle.text.toString().trim().isEmpty()
-            && createNoteBinding.inputNote.text.toString().trim().toString().isEmpty()
+            && createNoteBinding.inputNote.text.toString().trim().isEmpty()
         ) {
             Toast.makeText(this, "La nota debe contener descripcion", Toast.LENGTH_SHORT).show()
-            return;
+            return
         }
 
         val note = Note(
@@ -115,23 +125,19 @@ class CreateNoteActivity : AppCompatActivity() {
             subtitle = createNoteBinding.inputNoteSubtitle.text.toString(),
             noteText = createNoteBinding.inputNote.text.toString(),
             dateTime = createNoteBinding.textDataTime.text.toString(),
-            color = selected
+            color = selected,
+            imagePath = imagePath.toString(),
         )
 
         val executor = Executors.newSingleThreadExecutor()
         val handler = Handler(Looper.getMainLooper())
         executor.execute {
-            /*
-                * its like doInBackground()
-                * */
+
             NotesDatabases.getNotesDatabases(applicationContext)?.noteDao()?.insertNote(note)
 
             handler.post {
-                /*
-                * its like onPostExecute()
-                * */
 
-                val intent: Intent = Intent()
+                val intent = Intent()
                 setResult(RESULT_OK, intent)
                 finish()
             }
@@ -249,62 +255,30 @@ class CreateNoteActivity : AppCompatActivity() {
 
     private fun selectImage(bottomSheetBehavior: BottomSheetBehavior<LinearLayout>) {
         bottomSheetBehavior.state = BottomSheetBehavior.STATE_COLLAPSED
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-                && ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                selectAddImage()
-            } else {
-                ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS);
+            when {
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                ) == PackageManager.PERMISSION_GRANTED -> {
+                    selectAddImage()
+                }
+
+                else -> requestPermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
             }
         } else {
             selectAddImage()
         }
-
-
     }
 
 
     private fun selectAddImage() {
-        val intent = Intent(
-            Intent.ACTION_PICK,
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        )
+        val intent = Intent(Intent.ACTION_GET_CONTENT)
+        intent.type = "image/*"
 
-
-
-
-        // If you call startActivityForResult() using an intent that no app can handle, your app will crash.
-        // So as long as the result is not null, it's safe to use the intent.
-
-        // If you call startActivityForResult() using an intent that no app can handle, your app will crash.
-        // So as long as the result is not null, it's safe to use the intent.
-            // Bring up gallery to select a photo
-            resultLauncher.launch(intent)
-
+        startForActivityGallery.launch(intent)
 
     }
-
-    private fun loadFromUri(photoUri: Uri?): Bitmap? {
-        var image: Bitmap? = null
-        try {
-            // check version of Android on device
-            image = if (Build.VERSION.SDK_INT > 27) {
-                // on newer versions of Android, use the new decodeBitmap method
-                val source: ImageDecoder.Source =
-                    ImageDecoder.createSource(this.contentResolver, photoUri!!)
-                ImageDecoder.decodeBitmap(source)
-            } else {
-                // support older versions of Android by using getBitmap
-                MediaStore.Images.Media.getBitmap(this.contentResolver, photoUri)
-            }
-        } catch (e: IOException) {
-            e.printStackTrace()
-        }
-        return image
-    }
-
-
 
 
 
@@ -315,25 +289,7 @@ class CreateNoteActivity : AppCompatActivity() {
 
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        if (requestCode == REQUEST_CODE_STORAGE_PERMISSION) {
-            if (grantResults.size > 0 && requestCode == REQUEST_CODE_PERMISSIONS) {
-                if(grantResults[1] == PackageManager.PERMISSION_GRANTED)
-                selectAddImage()
-            } else {
-                Toast.makeText(this,
-                    "Se requieren permisos para utilizar la galeria",
-                    Toast.LENGTH_SHORT).show();
-                finish();
-            }
-        }
 
-    }
+
 }
-

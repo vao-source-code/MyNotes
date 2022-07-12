@@ -1,5 +1,6 @@
 package com.example.mynotes.entities
 
+import android.net.Uri
 import android.os.Parcelable
 import androidx.annotation.Nullable
 import androidx.room.ColumnInfo
@@ -13,7 +14,7 @@ import java.io.Serializable
 data class Note (
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "id")
-     var id: Int = 0 ,
+     var id: Int = 0,
 
     @ColumnInfo(name = "title")
      var title: String,
@@ -31,10 +32,10 @@ data class Note (
      var imagePath: String? = null,
 
     @ColumnInfo(name = "color")
-     var color: String? = null ,
+     var color: String? = null,
 
     @ColumnInfo(name = "web_link")
-     var webLink: String? = null ,
+     var webLink: String? = null,
 
     ) : Parcelable
 
